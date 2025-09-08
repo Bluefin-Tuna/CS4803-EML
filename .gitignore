@@ -1,0 +1,4 @@
+*.pyc
+MNIST/
+CIFAR10/
+.venv/
