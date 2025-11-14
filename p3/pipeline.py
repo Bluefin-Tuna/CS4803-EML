@@ -18,6 +18,7 @@ import os
 import time
 import json
 
+import numpy as np
 import torch
 import torch.distributed as dist
 from torch.distributed.pipelining import pipeline, ScheduleGPipe, SplitPoint
@@ -54,9 +55,19 @@ def make_split_spec_custom(model: BertModel, pattern: str, world_size: int):
         at 'encoder.layer.{c1}', 'encoder.layer.{c2}', ...
     Return a dict[str, SplitPoint].
     """
-    # >>> YOUR CODE HERE <<<
-    raise NotImplementedError("Implement custom unbalanced partitioning (e.g., 3-1-2-2).")
-
+    try:
+        parts = [int(x) for x in pattern.split('-')]
+    except ValueError:
+        raise ValueError(f"Invalid partition pattern: {pattern}")
+    assert len(parts) == world_size, f"Number of parts in pattern ({len(parts)}) must equal world_size ({world_size})"
+    n_layers = model.config.num_hidden_layers
+    assert sum(parts) == n_layers, f"Sum of parts ({sum(parts)}) must equal num_hidden_layers ({n_layers})"
+    split_spec = {}
+    cumulative = 0
+    for part in parts[:-1]:
+        cumulative += part
+        split_spec[f"encoder.layer.{cumulative}"] = SplitPoint.BEGINNING
+    return split_spec
 
 # ---------------------------
 # Optional: simple per-stage timing (hint)
@@ -67,12 +78,22 @@ def wrap_stage_forward_for_timing(module: torch.nn.Module, device: torch.device)
     OPTIONAL (Step 4): wrap stage forward to collect avg forward time per step.
     Use CUDA events; store accumulator in module._acc_ms.
     """
-    # >>> OPTIONAL: YOUR CODE HERE <<<
-    # Hints:
-    #   start = torch.cuda.Event(enable_timing=True); end = torch.cuda.Event(enable_timing=True)
-    #   with torch.cuda.device(device): start.record(); out = orig(*args, **kw); end.record()
-    #   torch.cuda.synchronize(device); module._acc_ms += start.elapsed_time(end)
-    pass
+    if not torch.cuda.is_available() or device.type != "cuda":
+        return module
+    forward = module.forward
+    module._acc_ms = 0.0
+    def timed(*args, **kwargs):
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        with torch.cuda.device(device):
+            start.record()
+            out = forward(*args, **kwargs)
+            end.record()
+        torch.cuda.synchronize(device)
+        module._acc_ms += start.elapsed_time(end)
+        return out
+    module.forward = timed
+    return module
 
 
 # ---------------------------
@@ -98,15 +119,35 @@ def warmup_and_measure(schedule: ScheduleGPipe,
           * Use dist.barrier() + torch.cuda.synchronize() before/after timing
       - Throughput (samples/s) = (global_batch_size * steps_measure) / elapsed_seconds
       - Peak memory per rank via torch.cuda.max_memory_allocated(rank)
-      - Return: (throughput: float, peaks_bytes: list[int])
+      - Return: (throughput: float, peaks_bytes: int)
 
     Hints:
       - Reset memory stats before timing on each rank: torch.cuda.reset_peak_memory_stats(rank)
       - Use time.time() wall clock for elapsed_seconds
     """
-    # >>> YOUR CODE HERE <<<
-    raise NotImplementedError("Implement warmup+measure timing and peak memory collection.")
-
+    assert global_batch_size % chunks == 0, "global_batch_size must be divisible by chunks"
+    def step():
+        if dist.get_rank() == 0:
+            inputs = generate_inputs_for_model(BertModel, model, "BertModel", global_batch_size // chunks, device)
+            schedule.step(**inputs)
+        else:
+            schedule.step()
+    for _ in range(steps_warmup):
+        step()
+    dist.barrier()
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+        torch.cuda.synchronize(device)
+    start = time.time()
+    for _ in range(steps_measure):
+        step()
+    dist.barrier()
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    end = time.time()
+    throughput = (global_batch_size * steps_measure) / (end - start)
+    memory = torch.cuda.max_memory_allocated(device) if device.type == "cuda" else [0]
+    return float(throughput), memory
 
 # ---------------------------
 # One run for a given seed
@@ -122,17 +163,11 @@ def run_one_seed(args, pipe_ir, model):
       - 'mem_peak_per_rank_bytes': List[int]
       - (optional) 'stage_forward_time_ms_per_rank': List[float or None]
     """
-    rank = dist.get_rank()
-
-    # Build runtime schedule
+    rank, world_size = dist.get_rank(), dist.get_world_size()
     stage = pipe_ir.build_stage(args.rank, device=args.device)
     schedule = ScheduleGPipe(stage, args.chunks)
-
-    # OPTIONAL: per-stage forward timing
-    # stage_module = pipe_ir.get_stage_module(rank)
-    # wrap_stage_forward_for_timing(stage_module, args.device)
-
-    # Warmup + measure
+    stage_module = pipe_ir.get_stage_module(rank)
+    wrap_stage_forward_for_timing(stage_module, args.device)
     thr, peaks = warmup_and_measure(
         schedule=schedule,
         model=model,
@@ -142,22 +177,20 @@ def run_one_seed(args, pipe_ir, model):
         steps_warmup=args.steps_warmup,
         steps_measure=args.steps_measure,
     )
-
-    # OPTIONAL: stage timing average per step if you wrapped forward
-    # stage_ms = getattr(stage_module, "_acc_ms", None)
-    # if stage_ms is not None:
-    #     stage_ms = float(stage_ms) / args.steps_measure
-
-    # Gather per-rank peaks to rank 0
-    # (Hint: use dist.all_gather_object to collect Python ints from all ranks)
-    # >>> YOUR CODE HERE <<<  (replace the fake single-rank list below)
-    peaks_all = [peaks]  # placeholder: WRONG; implement all_gather_object to collect from all ranks
-
+    stage_ms = getattr(stage_module, "_acc_ms", None)
+    if stage_ms is not None and args.steps_measure > 0:
+        stage_ms = float(stage_ms) / args.steps_measure
+    peaks_all = [None for _ in range(world_size)]
+    dist.all_gather_object(peaks_all, peaks)
+    stage_ms_all = None
+    if stage_ms is not None:
+        stage_ms_all = [None for _ in range(world_size)]
+        dist.all_gather_object(stage_ms_all, stage_ms)
     out = {
         "seed": args.seed,
         "throughput_samples_per_s": float(thr),
         "mem_peak_per_rank_bytes": peaks_all,
-        # "stage_forward_time_ms_per_rank": ...  # optional
+        "stage_forward_time_ms_per_rank": stage_ms_all,
     }
     return out
 
@@ -230,7 +263,57 @@ def run(args):
     #   - If args.out is set, write a dict containing spec + per_seed + agg results.
     #
     # >>> YOUR CODE HERE <<<
-    raise NotImplementedError("Implement multi-seed loop, aggregation, and optional JSON saving.")
+    seeds = [int(s) for s in args.seeds.split(',')]
+    results = []
+    for seed in seeds:
+        args.seed = seed
+        torch.manual_seed(seed)
+        if args.cuda and torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        result = run_one_seed(args, pipe_ir, model)
+        if rank == 0:
+            results.append(result)
+    if rank == 0:
+        throughputs = [res['throughput_samples_per_s'] for res in results]
+        throughput_mean = float(np.mean(throughputs))
+        throughput_std = float(np.std(throughputs))
+        
+        memories = [res['mem_peak_per_rank_bytes'] for res in results]
+        memory_stats = []
+        for ridx in range(world_size):
+            mems_rank = [memories[sidx][ridx] for sidx in range(len(seeds))]
+            mean_mem = float(np.mean(mems_rank))
+            std_mem = float(np.std(mems_rank))
+            memory_stats.append({'rank': ridx, 'mean': mean_mem, 'std': std_mem})
+
+        aggregated = {
+            'throughput_samples_per_s': {
+                'mean': throughput_mean,
+                'std': throughput_std
+            },
+            'mem_peak_per_rank_bytes': memory_stats
+        }
+
+        final_output = {
+            'spec': {
+                'world_size': world_size,
+                'global_batch_size': args.global_batch_size,
+                'chunks': args.chunks,
+                'steps_warmup': args.steps_warmup,
+                'steps_measure': args.steps_measure,
+                'partition': args.partition,
+                'seeds': seeds
+            },
+            'per_seed': results,
+            'aggregated': aggregated
+        }
+
+        print("Aggregated results:", json.dumps(aggregated, indent=2))
+
+        if args.out:
+            with open(args.out, 'w') as f:
+                json.dump(final_output, f, indent=2)
+            print(f"Results saved to {args.out}")
 
 
 def main():

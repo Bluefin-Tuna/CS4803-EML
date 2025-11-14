@@ -1,11 +1,15 @@
-.PHONY: broadcast help clean
+.PHONY: broadcast help clean pipeline pipeline-all step1 step2 step3 step4 step3-plots step4-compare
 
 # Default Python interpreter (can be overridden)
-PYTHON ?= python3
+PYTHON ?= python
 
 # Run broadcast.py
 broadcast:
 	$(PYTHON) broadcast.py
+
+# Run pipeline.py
+pipeline:
+	@echo "Use specific pipeline targets: step1, step2, step3, step4, or pipeline-all"
 
 # Help target
 help:
