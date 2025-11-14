@@ -1,5 +1,6 @@
 import torch
 import time
+import json
 
 
 def check_broadcast(x, a, b, c, d):
@@ -56,6 +57,14 @@ def timeit(boradcast):
     return toc - tic
 
 
-print('Running time for broadcast1:', timeit(broadcast1), '(s)')
-print('Running time for broadcast2:', timeit(broadcast2), '(s)')
-print('Running time for broadcast3:', timeit(broadcast3), '(s)')
+def main():
+    times = [
+        timeit(broadcast1),
+        timeit(broadcast2),
+        timeit(broadcast3),
+    ]
+    with open("results/part2_broadcast.json", "w") as f:
+        json.dump({ "times": times }, f)
+
+if __name__ == "__main__":
+    main()
