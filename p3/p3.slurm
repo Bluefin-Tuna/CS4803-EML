@@ -7,24 +7,24 @@ GBS=64
 WARMUP=20
 MEASURE=100
 
-# echo "Submitting Step 1 jobs (world_size 2, 3, 4)..."
-# for g in 2 3 4; do
-#   OUT="${RESULTS_DIR}/part3_step1__g${g}.json"
-#   echo "  sbatch (Step 1, gpus=${g}) -> ${OUT}"
-#   sbatch --export=ALL,WORLD_SIZE=${g},PARTITION=even,GBS=${GBS},CHUNKS=4,WARMUP=${WARMUP},MEASURE=${MEASURE},OUT="${OUT}" \
-#     "${SCRIPT_SLURM}"
-# done
+echo "Submitting Step 1 jobs (world_size 2, 3, 4)..."
+for g in 2 3 4; do
+  OUT="${RESULTS_DIR}/part3_step1__g${g}.json"
+  echo "  sbatch (Step 1, gpus=${g}) -> ${OUT}"
+  sbatch --export=ALL,WORLD_SIZE=${g},PARTITION=even,GBS=${GBS},CHUNKS=4,WARMUP=${WARMUP},MEASURE=${MEASURE},OUT="${OUT}" \
+    "${SCRIPT_SLURM}"
+done
 
-# echo
-# echo "Submitting Step 3 jobs (g=2,4; chunks=4,8,16)..."
-# for g in 2 4; do
-#   for c in 4 8 16; do
-#     OUT="${RESULTS_DIR}/part3_step3__c${c}_g${g}.json"
-#     echo "  sbatch (Step 3, gpus=${g}, chunks=${c}) -> ${OUT}"
-#     sbatch --export=ALL,WORLD_SIZE=${g},PARTITION=even,GBS=${GBS},CHUNKS=${c},WARMUP=${WARMUP},MEASURE=${MEASURE},OUT="${OUT}" \
-#       "${SCRIPT_SLURM}"
-#   done
-# done
+echo
+echo "Submitting Step 3 jobs (g=2,4; chunks=4,8,16)..."
+for g in 2 4; do
+  for c in 4 8 16; do
+    OUT="${RESULTS_DIR}/part3_step3__c${c}_g${g}.json"
+    echo "  sbatch (Step 3, gpus=${g}, chunks=${c}) -> ${OUT}"
+    sbatch --export=ALL,WORLD_SIZE=${g},PARTITION=even,GBS=${GBS},CHUNKS=${c},WARMUP=${WARMUP},MEASURE=${MEASURE},OUT="${OUT}" \
+      "${SCRIPT_SLURM}"
+  done
+done
 
 echo
 echo "Submitting Step 4 jobs (balanced vs unbalanced)..."
