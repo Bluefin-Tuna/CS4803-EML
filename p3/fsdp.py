@@ -51,8 +51,11 @@ def set_seed_all(seed: int):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
+
 def unwrap_model(m):
+    # Unwrap DDP/FSDP to get at the underlying HF model (has .config, etc.)
     return m.module if hasattr(m, "module") else m
+
 
 def pretty_bytes(n):
     for unit in ["B","KB","MB","GB","TB"]:
@@ -142,7 +145,6 @@ def run_train_step(model, inputs, optimizer, scaler: GradScaler | None, autocast
                 reduction="mean"        # scalar
             )
 
-
     if scaler is not None:
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -169,9 +171,15 @@ def warmup_and_measure(args, model, device, global_batch_size, steps_warmup, ste
     rank = dist.get_rank()
     world_size = dist.get_world_size()
 
-    # Build a full-batch input
-    inputs = generate_inputs_for_model(BertForMaskedLM, model, "BertForMaskedLM",
-                                       global_batch_size, device)
+    base_model = unwrap_model(model)
+
+    inputs = generate_inputs_for_model(
+        BertForMaskedLM,
+        base_model,
+        "BertForMaskedLM",
+        global_batch_size,
+        device,
+    )
 
     optimizer = make_optimizer(model, lr=args.lr, weight_decay=args.weight_decay)
     scaler = GradScaler(enabled=args.amp)
@@ -183,8 +191,8 @@ def warmup_and_measure(args, model, device, global_batch_size, steps_warmup, ste
             _ = run_train_step(model, inputs, optimizer, scaler, autocast_enabled=args.amp)
         else:
             _ = run_eval_step(model, inputs, autocast_enabled=args.amp)
-    dist.barrier(); torch.cuda.synchronize(device)
-
+    dist.barrier()
+    torch.cuda.synchronize(device)
     # Measure
     reset_peak(device)
     t0 = time.time()
@@ -193,7 +201,8 @@ def warmup_and_measure(args, model, device, global_batch_size, steps_warmup, ste
             _ = run_train_step(model, inputs, optimizer, scaler, autocast_enabled=args.amp)
         else:
             _ = run_eval_step(model, inputs, autocast_enabled=args.amp)
-    dist.barrier(); torch.cuda.synchronize(device)
+    dist.barrier()
+    torch.cuda.synchronize(device)
     elapsed = time.time() - t0
 
     throughput = (global_batch_size * steps_measure) / elapsed
@@ -336,7 +345,13 @@ def run(args):
         # quick fwd/bwd to sanity check the selected mode
         model = build_model_by_mode(args, device)
         gbs = max(2, args.global_batch_size // 2)
-        inputs = generate_inputs_for_model(BertForMaskedLM, unwrap_model(model), "BertForMaskedLM", gbs, device)
+        inputs = generate_inputs_for_model(
+            BertForMaskedLM,
+            unwrap_model(model),
+            "BertForMaskedLM",
+            gbs,
+            device,
+        )
         opt = make_optimizer(model, lr=args.lr, weight_decay=args.weight_decay)
         scaler = GradScaler(enabled=args.amp)
         loss = run_train_step(model, inputs, opt, scaler, autocast_enabled=args.amp)
@@ -384,6 +399,8 @@ def main():
     p.add_argument('--quick_demo', action='store_true')
 
     args = p.parse_args()
+
+    lrank = dist.rank()
 
     if args.cuda:
         dev_id = args.rank % max(1, torch.cuda.device_count())

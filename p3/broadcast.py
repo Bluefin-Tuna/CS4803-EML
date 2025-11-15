@@ -22,13 +22,12 @@ def broadcast2(x, a, b, c, d):
 
 
 def broadcast3(x, a, b, c, d):
-    x = x if x.is_pinned() else x.pin_memory()
     a.copy_(x, non_blocking=True)
     b.copy_(x, non_blocking=True)
     c.copy_(x, non_blocking=True)
     d.copy_(x, non_blocking=True)
 
-def timeit(boradcast):
+def timeit(broadcast, is_pinned=False):
 
     x = torch.randn((100000, 10000))
     a = torch.zeros((100000, 10000), device="cuda:0")
@@ -36,6 +35,8 @@ def timeit(boradcast):
     c = torch.zeros((100000, 10000), device="cuda:2")
     d = torch.zeros((100000, 10000), device="cuda:3")
 
+    if is_pinned:
+        x = x if x.is_pinned() else x.pin_memory()
 
     torch.cuda.synchronize(0)
     torch.cuda.synchronize(1)
@@ -44,7 +45,7 @@ def timeit(boradcast):
 
     tic = time.time()
 
-    boradcast(x, a, b, c, d)
+    broadcast(x, a, b, c, d)
 
     torch.cuda.synchronize(0)
     torch.cuda.synchronize(1)
@@ -61,7 +62,7 @@ def main():
     times = [
         timeit(broadcast1),
         timeit(broadcast2),
-        timeit(broadcast3),
+        timeit(broadcast3, is_pinned=True),
     ]
     with open("results/part2_broadcast.json", "w") as f:
         json.dump({ "times": times }, f)

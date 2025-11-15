@@ -106,7 +106,8 @@ def warmup_and_measure(schedule: ScheduleGPipe,
                        global_batch_size: int,
                        chunks: int,
                        steps_warmup: int,
-                       steps_measure: int):
+                       steps_measure: int,
+                       seed: int):
     """
     TODO (Step 1, Step 2, Step 3): implement full measurement.
 
@@ -126,28 +127,50 @@ def warmup_and_measure(schedule: ScheduleGPipe,
       - Use time.time() wall clock for elapsed_seconds
     """
     assert global_batch_size % chunks == 0, "global_batch_size must be divisible by chunks"
+
+    rank = dist.get_rank()
+
     def step():
-        if dist.get_rank() == 0:
-            inputs = generate_inputs_for_model(BertModel, model, "BertModel", global_batch_size // chunks, device)
+        if rank == 0:
+            inputs = generate_inputs_for_model(BertModel, model, "BertModel", global_batch_size, device)
             schedule.step(**inputs)
         else:
-            schedule.step()
-    for _ in range(steps_warmup):
+            _ = schedule.step()
+
+    dist.barrier()
+    for i in range(steps_warmup):
         step()
     dist.barrier()
+
+    # Measurement
     if device.type == "cuda":
-        torch.cuda.reset_peak_memory_stats(device)
-        torch.cuda.synchronize(device)
+        idx = device.index if device.index is not None else 0
+        torch.cuda.reset_peak_memory_stats(idx)
+        torch.cuda.synchronize(idx)
+
     start = time.time()
+
     for _ in range(steps_measure):
         step()
-    dist.barrier()
+
     if device.type == "cuda":
-        torch.cuda.synchronize(device)
+        idx = device.index if device.index is not None else 0
+        torch.cuda.synchronize(idx)
+
     end = time.time()
-    throughput = (global_batch_size * steps_measure) / (end - start)
-    memory = torch.cuda.max_memory_allocated(device) if device.type == "cuda" else [0]
-    return float(throughput), memory
+    dist.barrier()
+
+    elapsed = end - start
+    throughput = (global_batch_size * steps_measure) / elapsed
+
+    if device.type == "cuda":
+        idx = device.index if device.index is not None else 0
+        peak_bytes = torch.cuda.max_memory_allocated(idx)
+    else:
+        peak_bytes = 0
+
+    return float(throughput), int(peak_bytes)
+
 
 # ---------------------------
 # One run for a given seed
@@ -164,7 +187,7 @@ def run_one_seed(args, pipe_ir, model):
       - (optional) 'stage_forward_time_ms_per_rank': List[float or None]
     """
     rank, world_size = dist.get_rank(), dist.get_world_size()
-    stage = pipe_ir.build_stage(args.rank, device=args.device)
+    stage = pipe_ir.build_stage(rank, device=args.device)
     schedule = ScheduleGPipe(stage, args.chunks)
     stage_module = pipe_ir.get_stage_module(rank)
     wrap_stage_forward_for_timing(stage_module, args.device)
@@ -176,6 +199,7 @@ def run_one_seed(args, pipe_ir, model):
         chunks=args.chunks,
         steps_warmup=args.steps_warmup,
         steps_measure=args.steps_measure,
+        seed=args.seed,
     )
     stage_ms = getattr(stage_module, "_acc_ms", None)
     if stage_ms is not None and args.steps_measure > 0:
@@ -213,7 +237,7 @@ def run(args):
 
     if rank == 0:
         print(model.config)
-        print(f"Total params ≈ {get_number_of_params(model) // 10 ** 6}M")
+        print(f"Total params = {get_number_of_params(model) // 10 ** 6}M")
 
     # Example microbatch
     assert args.global_batch_size % args.chunks == 0, "global_batch_size must be divisible by chunks"
@@ -338,14 +362,18 @@ def main():
 
     args = p.parse_args()
 
+    lrank = int(os.getenv("LOCAL_RANK", 0))
+
     if args.cuda:
-        dev_id = args.rank % max(1, torch.cuda.device_count())
-        args.device = torch.device(f"cuda:{dev_id}")
+        torch.cuda.set_device(lrank)
+        args.device = torch.device(f"cuda:{lrank}")
     else:
         args.device = torch.device("cpu")
 
     backend = "nccl" if args.cuda else "gloo"
-    dist.init_process_group(backend=backend, rank=args.rank, world_size=args.world_size)
+    dist.init_process_group(backend=backend, rank=args.rank, world_size=args.world_size, device_id=lrank)
+
+    args.world_size = dist.get_world_size()
 
     try:
         run(args)

@@ -1,0 +1,33 @@
+W1115 00:12:11.718000 236696 torch/distributed/elastic/multiprocessing/api.py:908] Sending process 236820 closing signal SIGTERM
+W1115 00:12:11.720000 236696 torch/distributed/elastic/multiprocessing/api.py:908] Sending process 236822 closing signal SIGTERM
+W1115 00:12:11.721000 236696 torch/distributed/elastic/multiprocessing/api.py:908] Sending process 236823 closing signal SIGTERM
+E1115 00:12:12.082000 236696 torch/distributed/elastic/multiprocessing/api.py:882] failed (exitcode: -11) local_rank: 0 (pid: 236819) of binary: /coc/flash5/tchopra32/eml/p3/.venv/bin/python
+Traceback (most recent call last):
+  File "/coc/flash5/tchopra32/eml/p3/.venv/bin/torchrun", line 10, in <module>
+    sys.exit(main())
+  File "/coc/flash5/tchopra32/eml/p3/.venv/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
+    return f(*args, **kwargs)
+  File "/coc/flash5/tchopra32/eml/p3/.venv/lib/python3.10/site-packages/torch/distributed/run.py", line 936, in main
+    run(args)
+  File "/coc/flash5/tchopra32/eml/p3/.venv/lib/python3.10/site-packages/torch/distributed/run.py", line 927, in run
+    elastic_launch(
+  File "/coc/flash5/tchopra32/eml/p3/.venv/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 156, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/coc/flash5/tchopra32/eml/p3/.venv/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 293, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+========================================================
+pipeline.py FAILED
+--------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+--------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2025-11-15_00:12:11
+  host      : flexo.cc.gatech.edu
+  rank      : 0 (local_rank: 0)
+  exitcode  : -11 (pid: 236819)
+  error_file: <N/A>
+  traceback : Signal 11 (SIGSEGV) received by PID 236819
+========================================================

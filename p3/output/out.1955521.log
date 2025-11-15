@@ -1,0 +1,64 @@
+Host: droid
+GPUs visible: 0,1,2,3
+Running config:
+  WORLD_SIZE = 4
+  PARTITION  = even
+  GBS        = 64
+  CHUNKS     = 16
+  WARMUP     = 20
+  MEASURE    = 100
+  SEEDS      = 1,2,3
+  OUT        = ./results/part3_step3__c16_g4.json
+BertConfig {
+  "attention_probs_dropout_prob": 0.1,
+  "classifier_dropout": null,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.1,
+  "hidden_size": 768,
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "layer_norm_eps": 1e-12,
+  "max_position_embeddings": 512,
+  "model_type": "bert",
+  "num_attention_heads": 12,
+  "num_hidden_layers": 12,
+  "pad_token_id": 0,
+  "position_embedding_type": "absolute",
+  "return_dict": false,
+  "transformers_version": "4.57.1",
+  "type_vocab_size": 2,
+  "use_cache": true,
+  "vocab_size": 30522
+}
+
+Total params = 109M
+Split points: ['encoder.layer.3', 'encoder.layer.6', 'encoder.layer.9']
+Aggregated results: {
+  "throughput_samples_per_s": {
+    "mean": 225.25942928228878,
+    "std": 2.0699289041063005
+  },
+  "mem_peak_per_rank_bytes": [
+    {
+      "rank": 0,
+      "mean": 5556006912.0,
+      "std": 0.0
+    },
+    {
+      "rank": 1,
+      "mean": 5454557184.0,
+      "std": 0.0
+    },
+    {
+      "rank": 2,
+      "mean": 5454557184.0,
+      "std": 0.0
+    },
+    {
+      "rank": 3,
+      "mean": 5555613184.0,
+      "std": 0.0
+    }
+  ]
+}
+Results saved to ./results/part3_step3__c16_g4.json
