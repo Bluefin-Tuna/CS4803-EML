@@ -400,17 +400,16 @@ def main():
 
     args = p.parse_args()
 
-    lrank = dist.rank()
+    lrank = int(os.getenv("LOCAL_RANK", 0))
 
     if args.cuda:
-        dev_id = args.rank % max(1, torch.cuda.device_count())
-        args.device = torch.device(f"cuda:{dev_id}")
+        torch.cuda.set_device(lrank)
+        args.device = torch.device(f"cuda:{lrank}")
     else:
         raise RuntimeError("This task requires CUDA GPUs.")
 
     backend = "nccl"
-    torch.cuda.set_device(args.rank)
-    dist.init_process_group(backend=backend, rank=args.rank, world_size=args.world_size)
+    dist.init_process_group(backend=backend, rank=args.rank, world_size=args.world_size, device_id=lrank)
 
     try:
         run(args)

@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH -J p3_fsdp                   # Job name
+#SBATCH -J p4                   # Job name
 #SBATCH -o ./output/out.%j.log       # Stdout
 #SBATCH -e ./error/err.%j.log        # Stderr
 #SBATCH -N 1                         # One node
-#SBATCH --gres=gpu:a40:4         # Request up to 4 GPUs
+#SBATCH --gres=gpu:h100:4         # Request up to 4 GPUs
 #SBATCH --mem=128G                   # Memory
 
 
