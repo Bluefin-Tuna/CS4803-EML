@@ -5,3 +5,6 @@ CIFAR10/
 cifar-10-python.tar.gz
 cifar-10-batches-py/
 *.pth
+*.zip
+*.pdf
+.DS_Store
