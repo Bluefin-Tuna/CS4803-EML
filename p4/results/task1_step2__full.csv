@@ -1,42 +1,57 @@
 temperature,sample_id,output
-1e-08,1,"The sum of 2 and 2 is 4.
+0.0,1,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-1e-08,2,"The sum of 2 and 2 is 4.
+0.0,2,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-1e-08,3,"The sum of 2 and 2 is 4.
+0.0,3,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-1e-08,4,"The sum of 2 and 2 is 4.
+0.0,4,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-1e-08,5,"The sum of 2 and 2 is 4.
+0.0,5,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-0.25,1,"The sum of 2 and 2 is 4.
-The sum of 2 and 3"
-0.25,2,The sum of 2 and 2 is 4. The sum of 2 and 3
-0.25,3,"The sum of 2 and 2 is 4.
+0.2,1,"The sum of 2 and 2 is 4.
 The sum of 3 and 3"
-0.25,4,"The sum of 2 and 2 is 4.
+0.2,2,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-0.25,5,The sum of 2 and 2 is 4. The sum of 2 and 3
-0.5,1,"The sum of 2 and 2 is 4.
+0.2,3,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-0.5,2,The sum of 2 and 2 is 4. The sum of 4 and 4
-0.5,3,"The sum of 2 and 2 is 4.
+0.2,4,"The sum of 2 and 2 is 4.
+The sum of 2 and 2"
+0.2,5,The sum of 2 and 2 is 4. The sum of 2 and 3
+0.4,1,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-0.5,4,The sum of 2 and 2 is 4. The sum of 4 and 4
-0.5,5,The sum of 2 and 2 is 4. The sum of 2 and 2
-0.75,1,"The sum of 2 and 2 is 4, and the sum of 3 and "
-0.75,2,"The sum of 2 and 2 is 4. (True or False)
+0.4,2,The sum of 2 and 2 is 4. The sum of 2 and 3
+0.4,3,"The sum of 2 and 2 is 4.
+The sum of 3 and 3"
+0.4,4,"The sum of 2 and 2 is 4.
+The sum of 2 and 2"
+0.4,5,The sum of 2 and 2 is 4. The sum of 2 and 3
+0.6,1,"The sum of 2 and 2 is 4.
+The sum of 2 and 3"
+0.6,2,The sum of 2 and 2 is 4. The sum of 4 and 4
+0.6,3,"The sum of 2 and 2 is 4.
+The sum of 3 and 3"
+0.6,4,The sum of 2 and 2 is 4. The sum of 4 and 4
+0.6,5,The sum of 2 and 2 is 4. The sum of 2 and 2
+0.8,1,The sum of 2 and 2 is 4. The sum of 3 and 3
+0.8,2,"The sum of 2 and 2 is 4. (True or False)
 The correct answer"
-0.75,3,The sum of 2 and 2 is 4. The sum of 4 and 4
-0.75,4,"The sum of 2 and 2 is 4.
+0.8,3,"The sum of 2 and 2 is 4.
+
+Final Answer: The final answer is true"
+0.8,4,"The sum of 2 and 2 is 4.
 The sum of 2 and 3"
-0.75,5,The sum of 2 and 2 is 4. The sum of 2 and 4
+0.8,5,"The sum of 2 and 2 is 4.
+
+2 + 2 = 4
+
+"
 1.0,1,"The sum of 2 and 2 is 4.
 The sum of 2 and 2"
 1.0,2,"The sum of 2 and 2 is 4.
 Final Answer: The final answer is "
 1.0,3,"The sum of 2 and 2 is 4.
 The product of 2 and 2"
-1.0,4,The sum of 2 and 2 is 4. (The sum of two things is the
+1.0,4,The sum of 2 and 2 is 4. (The formula for the sum of two
 1.0,5,"The sum of 2 and 2 is 4.
 The sum of 4 and 2"
